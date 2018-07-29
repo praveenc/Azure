@@ -2,13 +2,13 @@
     "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-         "location": {
-             "type": "string",
-             "defaultValue": "[resourceGroup().location]",
-             "metadata": {
-                 "description": "Location for all resources."
-             }
-         },
+        "location": {
+            "type": "string",
+            "defaultValue": "[resourceGroup().location]",
+            "metadata": {
+                "description": "Location for all resources."
+            }
+        },
         "adminUserName": {
             "type": "string",
             "defaultValue": "devopsadmin"
@@ -16,38 +16,44 @@
         "adminPassword": {
             "type": "securestring"
         },
-        "dnsLabelPrefix": {
+        "ubuntuOSVersion": {
             "type": "string",
+            "defaultValue": "16.04.0-LTS",
+            "allowedValues": [
+                "12.04.5-LTS",
+                "14.04.5-LTS",
+                "15.10",
+                "16.04.0-LTS"
+            ],
             "metadata": {
-                "description": "Unique DNS Name for the Public IP used to access the Virtual Machine."
+                "description": "The Ubuntu version for the VM. This will pick a fully patched image of this given Ubuntu version."
             }
         },
-        "os_win_image_ref": {
+        "os_linux_image_ref": {
             "type": "object",
             "defaultValue": {
-                "publisher": "MicrosoftWindowsServer",
-                "offer": "WindowsServer",
-                "sku": "2012-R2-Datacenter",
+                "publisher": "Canonical",
+                "offer": "UbuntuServer",
+                "sku": "16.04.0-LTS",
                 "version": "latest"
             }
         }
     },
     "variables": {
-        "pipname": "mywinPIP",
-        "vnetname": "winVNET",
-        "subnetname": "winsubnet",
-        "nicname": "mywinNIC",
-        "nsgname": "mywinNSG",
-        "vmname": "mywinvm",
-        "iaasdiagextname": "IaaSDiagnostics",
-        "storageAccountName":"[concat(variables('vmname'), uniquestring(resourceGroup().id))]",
-        "vmsize": "Standard_D2_v2_Promo",
+        "pipname": "mylnxPIP",
+        "vnetname": "lnxVNET",
+        "subnetname": "lnxsubnet",
+        "nicname": "mylnxNIC",
+        "nsgname": "mylnxNSG",
+        "vmname": "mylnxvm",
+        "storageAccountName": "[concat(variables('vmname'), uniquestring(resourceGroup().id))]",
+        "dnsLabelPrefix": "[concat('mylnxvm-',uniquestring(resourceGroup().id))]",
+        "vmsize": "Standard_A1",
         "vnetCIDR": "10.0.0.0/16",
-        "subnetCIDR": "10.0.1.0/24",
+        "subnetCIDR": "10.0.0.0/24",
         "subnetID": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vnetname'), variables('subnetname'))]"
     },
-    "resources": [
-        {
+    "resources": [{
             "type": "Microsoft.Storage/storageAccounts",
             "name": "[variables('storageAccountName')]",
             "apiVersion": "2016-01-01",
@@ -63,20 +69,18 @@
             "apiVersion": "2017-08-01",
             "location": "[parameters('location')]",
             "name": "[variables('vnetname')]",
-            "properties":{
-                "addressSpace":{
+            "properties": {
+                "addressSpace": {
                     "addressPrefixes": [
                         "[variables('vnetCIDR')]"
                     ]
                 },
-                "subnets":[
-                    {
-                        "name": "[variables('subnetname')]",
-                        "properties":{
-                            "addressPrefix": "[variables('subnetCIDR')]"
-                        }
+                "subnets": [{
+                    "name": "[variables('subnetname')]",
+                    "properties": {
+                        "addressPrefix": "[variables('subnetCIDR')]"
                     }
-                ]
+                }]
 
             }
         },
@@ -90,21 +94,19 @@
                 "[resourceId('Microsoft.Network/publicIPAddresses/', variables('pipname'))]"
             ],
             "properties": {
-                "ipConfigurations":[
-                    {
-                        "name": "ipconfig1",
-                        "properties": {
-                            "privateIPAllocationMethod":"Dynamic",
-                            "publicIPAddress": {
-                                "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('pipname'))]"
-                            },
-                            "subnet": {
-                                "id": "[variables('subnetID')]"
-                            }
+                "ipConfigurations": [{
+                    "name": "ipconfig1",
+                    "properties": {
+                        "privateIPAllocationMethod": "Dynamic",
+                        "publicIPAddress": {
+                            "id": "[resourceId('Microsoft.Network/publicIPAddresses',variables('pipname'))]"
+                        },
+                        "subnet": {
+                            "id": "[variables('subnetID')]"
                         }
                     }
-                ],
-                "networkSecurityGroup":{
+                }],
+                "networkSecurityGroup": {
                     "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('nsgname'))]"
                 }
             }
@@ -115,22 +117,20 @@
             "name": "[variables('nsgname')]",
             "apiVersion": "2017-06-01",
             "location": "[parameters('location')]",
-            "properties":{
-                "securityRules":[
-                    {
-                        "name": "RDP",
-                        "properties":{
-                            "priority": 1000,
-                            "protocol":"Tcp",
-                            "direction":"Inbound",
-                            "access":"Allow",
-                            "sourceAddressPrefix": "*",
-                            "sourcePortRange": "*",
-                            "destinationAddressPrefix": "*",
-                            "destinationPortRange": "3389"
-                        }
+            "properties": {
+                "securityRules": [{
+                    "name": "SSH",
+                    "properties": {
+                        "priority": 1000,
+                        "protocol": "Tcp",
+                        "direction": "Inbound",
+                        "access": "Allow",
+                        "sourceAddressPrefix": "*",
+                        "sourcePortRange": "*",
+                        "destinationAddressPrefix": "*",
+                        "destinationPortRange": "22"
                     }
-                ]
+                }]
             }
         },
         {
@@ -140,8 +140,8 @@
             "name": "[variables('pipname')]",
             "properties": {
                 "publicIPAllocationMethod": "Dynamic",
-                "dnsSettings":{
-                    "domainNameLabel": "[parameters('dnsLabelPrefix')]"
+                "dnsSettings": {
+                    "domainNameLabel": "[variables('dnsLabelPrefix')]"
                 }
             }
 
@@ -155,35 +155,36 @@
                 "[resourceId('Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]",
                 "[resourceId('Microsoft.Network/networkInterfaces', variables('nicname'))]"
             ],
-            "properties":{
-                "hardwareProfile":{
+            "properties": {
+                "hardwareProfile": {
                     "vmSize": "[variables('vmsize')]"
                 },
-                "osProfile": {
-                    "computerName": "[variables('vmname')]",
-                    "adminUsername": "[parameters('adminUserName')]",
-                    "adminPassword": "[parameters('adminPassword')]",
-                    "windowsConfiguration":{
-                        "provisionVMAgent":true
-                    }
-                },
-                "storageProfile":{
-                    "imageReference": "[parameters('os_win_image_ref')]",
-                    "dataDisks": [],
-                    "osDisk":{
+                 "osProfile": {
+                     "computerName": "[variables('vmName')]",
+                     "adminUsername": "[parameters('adminUsername')]",
+                     "adminPassword": "[parameters('adminPassword')]"
+                 },
+                "storageProfile": {
+                    "imageReference": "[parameters('os_linux_image_ref')]",
+                    "dataDisks": [
+                        {
+                            "diskSizeGB": 1023,
+                            "lun": 0,
+                            "createOption": "Empty"
+                        }
+                    ],
+                    "osDisk": {
                         "createOption": "FromImage",
                         "caching": "None",
-                        "managedDisk":{
+                        "managedDisk": {
                             "storageAccountType": "Standard_LRS"
                         }
                     }
                 },
-                "networkProfile":{
-                    "networkInterfaces":[
-                        {
-                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('nicname'))]"
-                        }
-                    ]
+                "networkProfile": {
+                    "networkInterfaces": [{
+                        "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('nicname'))]"
+                    }]
                 },
                 "diagnosticsProfile": {
                     "bootDiagnostics": {
@@ -192,14 +193,6 @@
                     }
                 }
             }
-        },
-        {
-            "type": "Microsoft.Compute/virtualMachines/extensions",
-            "apiVersion": "2017-12-01",
-            "location": "[parameters('location')]",
-            "name": "[variables('iaasdiagextname')]",
-            
-
         }
     ],
     "outputs": {
